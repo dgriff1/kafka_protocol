@@ -23,6 +23,8 @@
 -define(KAFKA_VERSION, {0,9,0}). %% by default
 -endif.
 
+-type kpro_compress_option() :: no_compression | gzip | snappy.
+
 %% Compression attributes
 -define(KPRO_COMPRESS_NONE, 0).
 -define(KPRO_COMPRESS_GZIP, 1).

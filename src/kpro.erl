@@ -20,6 +20,7 @@
 -export([ fetch_request/6
         , offset_request/4
         , produce_request/5
+        , produce_request/6
         ]).
 
 -export([ decode_response/1
@@ -80,21 +81,25 @@ fetch_request(Topic, Partition, Offset, MaxWaitTime, MinBytes, MaxBytes) ->
                     }.
 
 
+%% @equiv produce_request(Topic, Partition, KvList, RequiredAcks,
+%%                        AckTimeout, no_compression).
+%% @end
+-spec produce_request(topic(), partition(), [{binary(), binary()}],
+                      integer(), non_neg_integer()) ->
+                        kpro_ProduceRequest().
+produce_request(Topic, Partition, KafkaKvList, RequiredAcks, AckTimeout) ->
+  produce_request(Topic, Partition, KafkaKvList, RequiredAcks, AckTimeout,
+                  no_compression).
+
 %% @doc Help function to construct a #kpro_ProduceRequest{} for
 %% messages targeting one single topic-partition.
 %% @end
 -spec produce_request(topic(), partition(), [{binary(), binary()}],
-                      integer(), non_neg_integer()) ->
-                         kpro_ProduceRequest().
-produce_request(Topic, Partition, KafkaKvList, RequiredAcks, AckTimeout) ->
-  Messages =
-    lists:map(fun({K, V}) ->
-                  #kpro_Message{ magicByte  = ?KPRO_MAGIC_BYTE
-                               , attributes = ?KPRO_ATTRIBUTES
-                               , key        = K
-                               , value      = V
-                               }
-              end, KafkaKvList),
+                      integer(), non_neg_integer(),
+                      kpro_compress_option()) -> kpro_ProduceRequest().
+produce_request(Topic, Partition, KafkaKvList,
+                RequiredAcks, AckTimeout, CompressOption) ->
+  Messages = messages(KafkaKvList, CompressOption),
   PartitionMsgSet =
     #kpro_PartitionMessageSet{ partition = Partition
                              , message_L = Messages
@@ -177,6 +182,27 @@ encode_request(#kpro_Request{ apiVersion     = ApiVersion0
   [encode({int32, Size}), IoData].
 
 %%%_* Internal functions =======================================================
+
+messages(KafkaKvList, Compression) ->
+  Messages =
+    lists:map(fun({K, V}) ->
+                #kpro_Message{ attributes = ?KPRO_COMPRESS_NONE
+                             , key        = K
+                             , value      = V
+                             }
+              end, KafkaKvList),
+  case Compression =:= no_compression of
+    true  -> Messages;
+    false -> compress(Compression, Messages)
+  end.
+
+compress(gzip, Messages) ->
+  IoData = [encode(Message) || Message <- Messages],
+  Msg = #kpro_Message{ attributes = ?KPRO_COMPRESS_GZIP
+                     , key        = <<>>
+                     , value      = zlib:gzip(IoData)
+                     },
+  [Msg].
 
 get_api_version(#kpro_OffsetCommitRequestV1{}) -> 1;
 get_api_version(#kpro_OffsetCommitRequestV2{}) -> 2;
