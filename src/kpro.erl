@@ -193,14 +193,22 @@ messages(KafkaKvList, Compression) ->
               end, KafkaKvList),
   case Compression =:= no_compression of
     true  -> Messages;
-    false -> compress(Compression, Messages)
+    false -> compressed_message(Compression, Messages)
   end.
 
-compress(gzip, Messages) ->
+compress(snappy, IoData) ->
+  {ok, Compressed} = snappy:compress(IoData),
+  {?KPRO_COMPRESS_SNAPPY, Compressed};
+
+compress(gzip, IoData)->
+  {?KPRO_COMPRESS_GZIP, zlib:gzip(IoData)}.
+
+compressed_message(Encoding, Messages) ->
   IoData = [encode(Message) || Message <- Messages],
-  Msg = #kpro_Message{ attributes = ?KPRO_COMPRESS_GZIP
+  {EncodingAttribute, Compressed} = compress(Encoding, IoData),
+  Msg = #kpro_Message{ attributes = EncodingAttribute
                      , key        = <<>>
-                     , value      = zlib:gzip(IoData)
+                     , value      = Compressed
                      },
   [Msg].
 

@@ -2,7 +2,11 @@ PROJECT = kafka_protocol
 PROJECT_DESCRIPTION = Kafka protocol erlang library
 PROJECT_VERSION = 0.2.3
 
+DEPS = erlang-snappy-nif
+
 COVER = true
+
+dep_erlang-snappy-nif = git https://github.com/fdmanana/snappy-erlang-nif.git master
 
 EUNIT_OPTS = verbose
 ERLC_OPTS = -Werror +warn_unused_vars +warn_shadow_vars +warn_unused_import +warn_obsolete_guard +debug_info
